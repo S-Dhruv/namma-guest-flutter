@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:namma_guest/Model/api_response.dart';
+import 'package:namma_guest/Screens/Admin/Onboarding/name_onboarding_page.dart';
+import 'package:namma_guest/Screens/Main/user_page.dart';
 
+import '../../Api/api_service.dart';
 import '../Main/main_page.dart';
 
 class Otp extends StatefulWidget {
-  const Otp({super.key});
+  final String email; // This will hold the parameter passed
+
+  // Constructor to accept the phoneNumber parameter
+  const Otp({Key? key, required this.email}) : super(key: key);
 
   @override
   _OtpState createState() => _OtpState();
 }
 
 class _OtpState extends State<Otp> {
-
+  ApiService apiService = ApiService();
   final List<TextEditingController> _controllers = List.generate(4, (_) => TextEditingController());
 
   @override
@@ -104,7 +111,48 @@ class _OtpState extends State<Otp> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _onTap,
+                        onPressed: () async {
+                          final values = _controllers.map((controller) => controller.text).toList();
+                          String otp = values.join();
+
+                          if (otp.length == 4) {
+                            ApiResponse apiResponse = await apiService.verifyOtpRequest(widget.email, otp) as ApiResponse;
+                            if(apiResponse.status) {
+                              if (apiResponse.response.toString().toLowerCase()=="user") {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                      builder: (context) => UserPage()),
+                                );
+                              } else if (apiResponse.response.toString().toLowerCase()=="owner") {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                      builder: (context) => const NameOnboardingPage()),
+                                );
+                              } else {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                      builder: (context) => const MainScreen()),
+                                );
+                              }
+                            } else {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Error'),
+                                  content: Text(apiResponse.response),
+                                ),
+                              );
+                            }
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (context) => const AlertDialog(
+                                title: Text('Error'),
+                                content: Text("Unable to obtain proper format of OTP"),
+                              ),
+                            );
+                          }
+                        },
                         style: ButtonStyle(
                           foregroundColor:
                           MaterialStateProperty.all<Color>(Colors.white),
@@ -144,14 +192,32 @@ class _OtpState extends State<Otp> {
               const SizedBox(
                 height: 18,
               ),
-              const Text(
-                "Resend New Code",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.purple,
+              GestureDetector(
+                child: const Text(
+                  "Resend New Code",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple,
+                  ),
+                  textAlign: TextAlign.center
                 ),
-                textAlign: TextAlign.center,
+                onTap: () async {
+                  ApiResponse otpResponse = await apiService.resendOtpRequest(widget.email);
+                  if(otpResponse.status) {
+                    for(var _controller in _controllers) {
+                      _controller.clear();
+                    }
+                  } else {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Error'),
+                        content: Text(otpResponse.response),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -193,15 +259,6 @@ class _OtpState extends State<Otp> {
           ),
         ),
       ),
-    );
-  }
-
-  void _onTap() {
-    final values = _controllers.map((controller) => controller.text).toList();
-    int otp = int.parse(values.join());
-
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const MainScreen()),
     );
   }
 }
